@@ -26,6 +26,7 @@ export default function CodeEditor() {
   const [language, setLanguage] = useState<string>('cpp');
   const [output, setOutput] = useState<string>('');
   const [extensions, setExtensions] = useState<Extension[]>([]);
+  const [fontSize, setFontSize] = useState<number>(14);
 
   // Handle mounting
   useEffect(() => {
@@ -111,6 +112,20 @@ export default function CodeEditor() {
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Code Editor</h1>
           <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
+              <label className="text-gray-900 dark:text-white">Font Size:</label>
+              <select
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded"
+              >
+                {[12, 14, 16, 18, 20, 22, 24].map((size) => (
+                  <option key={size} value={size}>
+                    {size}px
+                  </option>
+                ))}
+              </select>
+            </div>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -143,12 +158,20 @@ export default function CodeEditor() {
           theme={darkMode ? 'dark' : 'light'}
           onChange={(value: string) => setCode(value)}
           className="mb-4 rounded-lg overflow-hidden"
-          style={{ fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ 
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: `${fontSize}px`
+          }}
         />
 
         <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
           <h3 className="font-bold mb-2 text-gray-900 dark:text-white">Output:</h3>
-          <pre className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">{output}</pre>
+          <pre 
+            className="whitespace-pre-wrap text-gray-800 dark:text-gray-200"
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {output}
+          </pre>
         </div>
       </div>
     </div>
