@@ -33,7 +33,9 @@ export default function ATSScorePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to analyze resume');
+        console.error('Response status:', response.status);
+        console.error('Response text:', await response.text());
+        throw new Error('Network response was not ok');
       }
 
       const data = await response.json();

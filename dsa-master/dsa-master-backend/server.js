@@ -1,231 +1,163 @@
-require('dotenv').config();
-console.log("🚀 Judge0 API Key:", process.env.RAPID_API_KEY);
-console.log("🌍 Judge0 API URL:", process.env.JUDGE0_API_URL);
-
 const express = require('express');
 const cors = require('cors');
-const { VM } = require('vm2');
-const { execSync } = require('child_process');
-const fs = require('fs');
+const { spawn } = require('child_process');
+const fs = require('fs').promises;
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
-const port = 5000;
+const PORT = process.env.PORT || 5000;
 
-// Enable CORS and JSON parsing
 app.use(cors());
 app.use(express.json());
 
-// Execute JavaScript code
-const runJavaScript = (code) => {
+const TEMP_DIR = path.join(__dirname, 'temp');
+
+// Ensure temp directory exists
+async function ensureTempDir() {
   try {
-    let output = '';
-    const vm = new VM({
-      timeout: 3000,
-      sandbox: {
-        console: {
-          log: (...args) => {
-            output += args.join(' ') + '\n';
-          }
-        }
+    await fs.access(TEMP_DIR);
+  } catch {
+    await fs.mkdir(TEMP_DIR, { recursive: true });
+  }
+}
+
+// Clean up old files
+async function cleanupOldFiles() {
+  try {
+    const files = await fs.readdir(TEMP_DIR);
+    const now = Date.now();
+    for (const file of files) {
+      const filePath = path.join(TEMP_DIR, file);
+      const stats = await fs.stat(filePath);
+      // Remove files older than 5 minutes
+      if (now - stats.mtimeMs > 5 * 60 * 1000) {
+        await fs.unlink(filePath);
       }
-    });
-    vm.run(code);
-    return { output: output.trim() || 'Code executed successfully (no output)' };
-  } catch (error) {
-    return { error: error.message };
-  }
-};
-
-// Execute Python code
-const runPython = (code) => {
-  const { spawnSync } = require('child_process');
-  try {
-    const process = spawnSync('python', ['-c', code]);
-    if (process.error) {
-      return { error: process.error.message };
     }
-    if (process.stderr.length > 0) {
-      return { error: process.stderr.toString() };
-    }
-    return { output: process.stdout.toString() || 'Code executed successfully (no output)' };
   } catch (error) {
-    return { error: error.message };
+    console.error('Cleanup error:', error);
   }
-};
+}
 
-// Execute C++ code
-// Replace the existing runCpp function with this new implementation
-const runCpp = (code, input = '') => {
-  const { spawn } = require('child_process');
-  const path = require('path');
+// Run cleanup every 5 minutes
+setInterval(cleanupOldFiles, 5 * 60 * 1000);
+
+async function runCode(language, code, input = '') {
+  const uniqueId = crypto.randomBytes(8).toString('hex');
+  const tempDir = path.join(TEMP_DIR, uniqueId);
+  await fs.mkdir(tempDir, { recursive: true });
 
   try {
-    // Save code to a temporary file
-    fs.writeFileSync('temp.cpp', code);
-    
-    // Compile
-    execSync('g++ temp.cpp -o temp');
-
-    // Create a promise to handle the asynchronous process
-    return new Promise((resolve) => {
-      const process = spawn('./temp', [], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-
-      let output = '';
-      let errorOutput = '';
-
-      // Write input to stdin
-      if (input) {
-        process.stdin.write(input);
-        process.stdin.end();
-      }
-
-      // Collect output
-      process.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-
-      process.on('close', (code) => {
-        // Cleanup
-        try {
-          fs.unlinkSync('temp.cpp');
-          fs.unlinkSync('temp');
-        } catch (e) {
-          console.error('Cleanup failed:', e);
-        }
-
-        if (code !== 0) {
-          resolve({ error: errorOutput || 'Execution failed' });
-        } else {
-          resolve({ output: output.trim() });
-        }
-      });
-
-      // Handle timeout
-      setTimeout(() => {
-        process.kill();
-        resolve({ error: 'Time Limit Exceeded' });
-      }, 5000);
-    });
-  } catch (error) {
-    return { error: error.message || 'Compilation Error' };
-  }
-};
-
-
-// Execute Java code
-const runJava = (code) => {
-  const { spawnSync } = require('child_process');
-  const fs = require('fs');
-  const path = require('path');
-
-  const tempFile = path.join(__dirname, 'Main.java');
-
-  try {
-    // Ensure code has Main class
-    const javaCode = code.includes('public class') 
-      ? code.replace(/public\s+class\s+\w+/g, 'public class Main')
-      : `public class Main { public static void main(String[] args) { ${code} } }`;
-
-    // Write code to file
-    fs.writeFileSync(tempFile, javaCode);
-
-    // Compile
-    const compile = spawnSync('javac', [tempFile]);
-    if (compile.error) {
-      return { error: compile.error.message };
-    }
-    if (compile.stderr.length > 0) {
-      return { error: compile.stderr.toString() };
-    }
-
-    // Run
-    const run = spawnSync('java', ['Main']);
-    if (run.error) {
-      return { error: run.error.message };
-    }
-    if (run.stderr.length > 0) {
-      return { error: run.stderr.toString() };
-    }
-
-    return { output: run.stdout.toString() || 'Code executed successfully (no output)' };
-  } catch (error) {
-    return { error: error.message };
-  } finally {
-    // Cleanup
-    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-    if (fs.existsSync('Main.class')) fs.unlinkSync('Main.class');
-  }
-};
-
-// Run code endpoint
-app.post('/api/run-code', async (req, res) => {
-  const { code, language, input } = req.body;
-  console.log('Received code execution request:', { language, hasInput: !!input });
-
-  try {
-    let result;
     switch (language) {
-      case 'javascript':
-        result = runJavaScript(code);
-        break;
-      case 'python':
-        result = runPython(code);
-        break;
-      case 'cpp':
-        result = await runCpp(code, input);
-        break;
-      case 'java':
-        result = runJava(code);
-        break;
+      case 'java': {
+        const className = 'Solution_' + uniqueId;
+        const modifiedCode = code.replace(/public\s+class\s+\w+/, `public class ${className}`);
+        const filePath = path.join(tempDir, `${className}.java`);
+        await fs.writeFile(filePath, modifiedCode);
+        
+        const compile = spawn('javac', [filePath]);
+        const execution = spawn('java', ['-cp', tempDir, className]);
+        if (input) execution.stdin.write(input);
+        execution.stdin.end();
+        
+        const output = await new Promise((resolve) => {
+          let stdout = '', stderr = '';
+          execution.stdout.on('data', (data) => stdout += data);
+          execution.stderr.on('data', (data) => stderr += data);
+          execution.on('close', () => resolve({ stdout, stderr }));
+        });
+        return output;
+      }
+      case 'python': {
+        const filePath = path.join(tempDir, 'script.py');
+        await fs.writeFile(filePath, code);
+        const execution = spawn('python', [filePath]);
+    if (input) execution.stdin.write(input);
+    execution.stdin.end();
+    
+    const output = await new Promise((resolve) => {
+      let stdout = '', stderr = '';
+      execution.stdout.on('data', (data) => stdout += data);
+      execution.stderr.on('data', (data) => stderr += data);
+      execution.on('close', () => resolve({ stdout, stderr }));
+    });
+    return output;
+      }
+      case 'cpp': {
+        const filePath = path.join(tempDir, 'program.cpp');
+        const exePath = path.join(tempDir, 'program.exe');
+        try {
+            await fs.writeFile(filePath, code);
+            await fs.access(filePath);
+        } catch (error) {
+            return { stdout: '', stderr: 'Failed to create or access C++ source file: ' + error.message };
+        }
+        // Check if g++ compiler is available
+        const gppCheck = await new Promise((resolve) => {
+          const check = spawn('g++', ['--version']);
+          check.on('error', () => resolve(false));
+          check.on('close', (code) => resolve(code === 0));
+        });
+
+        if (!gppCheck) {
+          return { stdout: '', stderr: 'g++ compiler not found' };
+        }
+        const compileOutput = await new Promise((resolve) => {
+          const compile = spawn('g++', [filePath, '-o', exePath]);
+          let stdout = '', stderr = '';
+          compile.stdout.on('data', (data) => stdout += data);
+          compile.stderr.on('data', (data) => stderr += data);
+          compile.on('error', (error) => resolve({ stdout: '', stderr: error.message }));
+          compile.on('close', (code) => {
+            if (code !== 0) {
+              resolve({ stdout: '', stderr: `Compilation failed: ${stderr}` });
+            }
+            resolve({ stdout, stderr });
+          });
+        });
+
+        if (compileOutput.stderr) {
+          return { stdout: '', stderr: compileOutput.stderr };
+        }
+        
+        const output = await new Promise((resolve) => {
+          const execution = spawn(exePath);
+          let stdout = '', stderr = '';
+          if (input) execution.stdin.write(input);
+          execution.stdin.end();
+          
+          execution.stdout.on('data', (data) => stdout += data);
+          execution.stderr.on('data', (data) => stderr += data);
+          execution.on('close', () => resolve({ stdout, stderr }));
+        });
+        return output;
+      }
+      case 'javascript': {
+        const filePath = path.join(tempDir, 'script.js');
+        await fs.writeFile(filePath, code);
+        const execution = spawn('node', [filePath]);
+        if (input) execution.stdin.write(input);
+        execution.stdin.end();
+        
+        const output = await new Promise((resolve) => {
+          let stdout = '', stderr = '';
+          execution.stdout.on('data', (data) => stdout += data);
+          execution.stderr.on('data', (data) => stderr += data);
+          execution.on('close', () => resolve({ stdout, stderr }));
+        });
+        return output;
+      }
       default:
-        result = { error: 'Unsupported language' };
+        throw new Error('Unsupported language');
     }
-    res.json(result);
-  } catch (error) {
-    res.json({ error: 'Execution failed' });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
   }
+}
+
+
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
-// Submit endpoint
-app.post('/api/submit-code', (req, res) => {
-  const { code, language } = req.body;
-  console.log('Received code submission:', { language });
-
-  let result;
-  switch (language) {
-    case 'javascript':
-      result = runJavaScript(code);
-      break;
-    case 'python':
-      result = runPython(code);
-      break;
-    case 'cpp':
-      result = runCpp(code);
-      break;
-    case 'java':
-      result = runJava(code);
-      break;
-    default:
-      result = { error: 'Unsupported language' };
-  }
-
-  res.json({
-    ...result,
-    status: 'submitted',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
-
-app.get('/', (req, res) => {
-  res.send('Server is running! Use /api/run-code to execute code.');
-});
-

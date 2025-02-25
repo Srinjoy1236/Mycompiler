@@ -85,28 +85,34 @@ export default function Dashboard() {
       )}
       <div className="grid gap-2">
         {problems.map((problem: Problem, index: number) => (
-          <Link
-            href={`/code-editor?problem=${encodeURIComponent(problem.title)}`}
-            key={index}
-            className="flex items-center justify-between bg-[#1a1b26]/50 p-3 rounded-lg hover:bg-[#1a1b26]/70 transition-all"
-          >
+          <div key={problem.title} className="flex items-center justify-between bg-[#1a1b26]/50 p-3 rounded-lg hover:bg-[#1a1b26]/70 transition-all group">
             <div className="flex items-center gap-4">
-              <span className="text-white/90 font-['JetBrains_Mono']">{problem.title}</span>
-              <span className={`${getDifficultyColor(problem.difficulty)} text-sm font-['JetBrains_Mono']`}>
+              <div className={`w-2 h-2 rounded-full ${problem.completed ? 'bg-green-400' : 'bg-gray-400'}`} />
+              <Link 
+                href={`/code-editor?problem=${encodeURIComponent(problem.title)}`}
+                className="text-white hover:text-orange-400 transition-colors"
+              >
+                {problem.title}
+              </Link>
+              <span className={`text-sm ${getDifficultyColor(problem.difficulty)}`}>
                 {problem.difficulty}
               </span>
             </div>
-            <div className="flex items-center gap-4">
-              {problem.language && (
-                <span className="text-white/60 text-sm font-['JetBrains_Mono'] lowercase">
-                  {problem.language}
-                </span>
-              )}
+            <div className="flex items-center gap-3">
+              <span className="text-white/60 text-sm font-['JetBrains_Mono'] lowercase bg-white/5 px-2 py-0.5 rounded">
+                {problem.language || 'cpp'}
+              </span>
               <span className="text-white/40 text-sm font-['JetBrains_Mono']">
                 {problem.timestamp ? new Date(problem.timestamp).toLocaleDateString() : 'Invalid Date'}
               </span>
+              <button
+                onClick={() => handleDelete(problem.title)}
+                className="opacity-0 group-hover:opacity-100 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 px-3 py-1.5 rounded-lg text-sm transition-all"
+              >
+                Delete
+              </button>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>
