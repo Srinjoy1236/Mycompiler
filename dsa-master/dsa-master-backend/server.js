@@ -5,6 +5,8 @@ console.log("🌍 Judge0 API URL:", process.env.JUDGE0_API_URL);
 const express = require('express');
 const cors = require('cors');
 const { VM } = require('vm2');
+const { execSync } = require('child_process');
+const fs = require('fs');
 
 const app = express();
 const port = 5000;
@@ -52,45 +54,69 @@ const runPython = (code) => {
 };
 
 // Execute C++ code
-const runCpp = (code) => {
-  const { spawnSync } = require('child_process');
-  const fs = require('fs');
+// Replace the existing runCpp function with this new implementation
+const runCpp = (code, input = '') => {
+  const { spawn } = require('child_process');
   const path = require('path');
 
-  const tempFile = path.join(__dirname, 'temp.cpp');
-  const outputFile = path.join(__dirname, 'temp.exe');
-
   try {
-    // Write code to file
-    fs.writeFileSync(tempFile, code);
-
+    // Save code to a temporary file
+    fs.writeFileSync('temp.cpp', code);
+    
     // Compile
-    const compile = spawnSync('g++', [tempFile, '-o', outputFile]);
-    if (compile.error) {
-      return { error: compile.error.message };
-    }
-    if (compile.stderr.length > 0) {
-      return { error: compile.stderr.toString() };
-    }
+    execSync('g++ temp.cpp -o temp');
 
-    // Run
-    const run = spawnSync(outputFile);
-    if (run.error) {
-      return { error: run.error.message };
-    }
-    if (run.stderr.length > 0) {
-      return { error: run.stderr.toString() };
-    }
+    // Create a promise to handle the asynchronous process
+    return new Promise((resolve) => {
+      const process = spawn('./temp', [], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
 
-    return { output: run.stdout.toString() || 'Code executed successfully (no output)' };
+      let output = '';
+      let errorOutput = '';
+
+      // Write input to stdin
+      if (input) {
+        process.stdin.write(input);
+        process.stdin.end();
+      }
+
+      // Collect output
+      process.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      process.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+
+      process.on('close', (code) => {
+        // Cleanup
+        try {
+          fs.unlinkSync('temp.cpp');
+          fs.unlinkSync('temp');
+        } catch (e) {
+          console.error('Cleanup failed:', e);
+        }
+
+        if (code !== 0) {
+          resolve({ error: errorOutput || 'Execution failed' });
+        } else {
+          resolve({ output: output.trim() });
+        }
+      });
+
+      // Handle timeout
+      setTimeout(() => {
+        process.kill();
+        resolve({ error: 'Time Limit Exceeded' });
+      }, 5000);
+    });
   } catch (error) {
-    return { error: error.message };
-  } finally {
-    // Cleanup
-    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-    if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+    return { error: error.message || 'Compilation Error' };
   }
 };
+
 
 // Execute Java code
 const runJava = (code) => {
@@ -138,32 +164,33 @@ const runJava = (code) => {
 };
 
 // Run code endpoint
-app.post('/api/run-code', (req, res) => {
-  const { code, language } = req.body;
-  console.log('Received code execution request:', { language });
+app.post('/api/run-code', async (req, res) => {
+  const { code, language, input } = req.body;
+  console.log('Received code execution request:', { language, hasInput: !!input });
 
-  let result;
-  switch (language) {
-    case 'javascript':
-      result = runJavaScript(code);
-      break;
-    case 'python':
-      result = runPython(code);
-      break;
-    case 'cpp':
-      result = runCpp(code);
-      break;
-    case 'java':
-      result = runJava(code);
-      break;
-    default:
-      result = { error: 'Unsupported language' };
+  try {
+    let result;
+    switch (language) {
+      case 'javascript':
+        result = runJavaScript(code);
+        break;
+      case 'python':
+        result = runPython(code);
+        break;
+      case 'cpp':
+        result = await runCpp(code, input);
+        break;
+      case 'java':
+        result = runJava(code);
+        break;
+      default:
+        result = { error: 'Unsupported language' };
+    }
+    res.json(result);
+  } catch (error) {
+    res.json({ error: 'Execution failed' });
   }
-
-  console.log('Execution result:', result);
-  res.json(result);
 });
-
 // Submit endpoint
 app.post('/api/submit-code', (req, res) => {
   const { code, language } = req.body;

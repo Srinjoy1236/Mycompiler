@@ -1,23 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Light mode colors */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --bg-card: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
 }
 
+/* Dark mode colors */
 .dark {
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 17, 24, 39;
+  --bg-primary: #151821;
+  --bg-secondary: #1D1E26;
+  --bg-card: #1D1E26;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --border-color: #2D3748;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-  font-family: 'Arial', sans-serif;
+  @apply gradient-bg min-h-screen;
+  font-family: 'JetBrains Mono', monospace;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
+/* Update component background colors */
+.bg-\[\#1E2A3B\], 
+.bg-\[\#1D1E26\], 
+.bg-\[\#0F172A\] {
+  background-color: var(--bg-card);
+}
+
+/* Update text colors */
+.text-gray-300 {
+  color: var(--text-secondary);
+}
+
+.text-gray-400 {
+  color: var(--text-secondary);
+}
+
+/* Border colors */
+.border-gray-700 {
+  border-color: var(--border-color);
+}
+
+/* Keep accent colors consistent */
+.text-orange-500 {
+  color: #ff5722;
+}
+
+.text-green-500 {
+  color: #22c55e;
+}
+
+.text-blue-500 {
+  color: #3b82f6;
+}
+
+/* File input styling */
+.file\:bg-orange-500 {
+  background-color: #ff5722;
+}
+
+.hover\:file\:bg-orange-600:hover {
+  background-color: #f4511e;
+}
+
+/* Button styling */
+.bg-orange-500 {
+  background-color: #ff5722;
+}
+
+.hover\:bg-orange-600:hover {
+  background-color: #f4511e;
+}
+
+/* Keep other existing styles */
 pre {
-  @apply p-2 bg-gray-800 text-white rounded;
+  @apply p-2 rounded;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* CodeMirror custom styles */
+.cm-editor, .cm-content, .cm-line {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* CodeMirror specific styles */
+.cm-editor {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cm-content {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cm-line {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cm-gutters {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Ensure font loading */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  font-display: swap;
+}
+
+@keyframes cursor-blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Add these glassmorphism utility classes */
+.glass-effect {
+  @apply bg-white/50 dark:bg-[#1D1E26]/50 backdrop-blur-sm shadow-lg;
+}
+
+.glass-card {
+  @apply bg-white/70 dark:bg-gray-800/30 backdrop-blur-sm shadow-sm;
+}
+
+.gradient-bg {
+  @apply bg-gradient-to-br from-black via-gray-900 to-gray-800;
+}
+
+/* Add subtle animations */
+.glass-effect, .glass-card {
+  @apply transition-all duration-300;
+}
+
+/* Add hover effects */
+.glass-card:hover {
+  @apply bg-white/5 transform scale-[1.02] border-white/20;
+}
+
+/* Add these new glassmorphic utility classes */
+.glass-black {
+  @apply bg-black/30 backdrop-blur-md border border-white/5 shadow-lg;
+}
+
+.glass-button {
+  @apply bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/10 transition-all;
+}
+
+.glass-input {
+  @apply bg-black/20 text-white/90 border border-white/10 focus:ring-1 focus:ring-white/20;
+}
+
+/* Add text colors */
+.text-glass {
+  @apply text-white/90;
+}
+
+.text-glass-muted {
+  @apply text-white/60;
 }
